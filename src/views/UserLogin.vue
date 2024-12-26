@@ -2,6 +2,7 @@
   <div class="login-container">
     <el-form ref="loginForm" :model="loginForm" status-icon :rules="rules" class="login-form">
       <h3 class="title">登录</h3>
+      <p style="color: red;">注意：登录功能暂对内开放，若需账号请联系管理员</p>
       <el-form-item prop="username">
         <el-input v-model="loginForm.username" placeholder="用户名"></el-input>
       </el-form-item>
@@ -10,6 +11,7 @@
       </el-form-item>
       <el-form-item>
         <el-button type="primary" @click="handleLogin">登录</el-button>
+        <el-button @click="noLogin">不登录，直接访问</el-button>
       </el-form-item>
       <p v-if="error" class="error">{{ error }}</p>
     </el-form>
@@ -49,15 +51,19 @@ export default {
           try {
             const res = await authApi.login(this.loginForm.username, this.loginForm.password);
             console.log('res---',res)
-            // if(res.code == 200){
+            if(res.code == 200){
               console.log('登录成功---', res);
-              this.error = null; // 登录成功后清除错误信息
-              //跳转到主页
-              this.$router.push('/HomePage')
-            // }else{
-            //   this.error = res.message
+              //登录成功后，将token更新到vuex中
+              this.$store.dispatch('login',res.data)
+              // 登录成功后清除错误信息
+              this.error = null; 
+              // 动态跳转到目标路径或首页
+              const redirect = this.$route.query.redirect || '/HomePage'; 
+              this.$router.push(redirect);
+            }else{
+              this.error = res.message
 
-            // }
+            }
           } catch (error) {
             this.error = error.response?.data?.message || '登录失败';
           }
@@ -66,6 +72,11 @@ export default {
           return false;
         }
       });
+    },
+    //不登录，直接访问
+    noLogin(){
+      const redirect = this.$route.query.redirect || '/HomePage'; 
+      this.$router.push(redirect);
     }
   }
 }

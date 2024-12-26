@@ -4,7 +4,6 @@
     <el-aside class="menu-container">
       <el-menu
         ref="menu-left"
-        :default-openeds="['1','2']"
         class="menu-left"
         background-color="#409EFF"
         text-color="#ffffff"
@@ -23,35 +22,35 @@
           </div>
         </template>
 
-        <el-menu-item index="0" @click="handleMenuClick('/HomePage')">
-          <i class="el-icon-menu left-menu-icon"></i>
-          首页
-        </el-menu-item>
+        <!-- 动态渲染菜单项 -->
+        <template v-for="menu in menuTree" >
+          <!-- 如果没有子菜单，直接渲染 el-menu-item -->
+          <el-menu-item
+            v-if="menu.children.length === 0"
+            :index="menu.menuIndex"
+            @click="handleMenuClick(menu.path)"
+            :key="menu.id"
+          >
+            <i :class="menu.iconEle ? menu.iconEle : 'el-icon-menu'" class="left-menu-icon"></i>
+            <span>{{ menu.name }}</span>
+          </el-menu-item>
 
-        <el-submenu index="1">
-          <template slot="title">
-            <i class="el-icon-document left-menu-icon"></i>
-            <span>文章</span>
-          </template>
-          <el-menu-item index="1-1" @click="handleMenuClick('/ArticleBasic')">
-            普通文章
-          </el-menu-item>
-          <el-menu-item index="1-2" @click="handleMenuClick('/ArticleVip')">
-            会员文章
-          </el-menu-item>
-          <el-menu-item index="1-3" @click="handleMenuClick('/ArticleSecret')">
-            机密文章
-          </el-menu-item>
-        </el-submenu>
-
-        <el-submenu index="2">
-          <template slot="title">
-            <i class="el-icon-setting left-menu-icon"></i>
-            <span>设置</span>
-          </template>
-          <el-menu-item index="2-1">设置1</el-menu-item>
-          <el-menu-item index="2-2">设置2</el-menu-item>
-        </el-submenu>
+          <!-- 如果有子菜单，渲染 el-submenu -->
+          <el-submenu v-else :index="menu.menuIndex" :key="menu.id">
+            <template slot="title">
+              <i :class="menu.iconEle ? menu.iconEle : 'el-icon-menu'" class="left-menu-icon"></i>
+              <span>{{ menu.name }}</span>
+            </template>
+            <el-menu-item
+              v-for="submenu in menu.children"
+              :key="submenu.id"
+              :index="submenu.menuIndex"
+              @click="handleMenuClick(submenu.path)"
+            >
+              {{ submenu.name }}
+            </el-menu-item>
+          </el-submenu>
+        </template>
 
       </el-menu>
     </el-aside>
@@ -62,10 +61,17 @@
         <el-menu mode="horizontal" class="header-nav">
           <!-- 顶部导航栏-左侧区域 -->
           <div class="header-nav-left">
+            <span>您账号有效期倒计时为：</span>
+            <br>
+            <span>{{ countdown }}</span>
+          </div>
+
+          <!-- 顶部导航栏-中间区域 -->
+          <div class="header-nav-middle">
             <!-- 顶部导航栏-左侧区域-搜索栏 -->
             <div class="search-wrapper">
               <el-input
-                placeholder="请输入搜索内容"
+                placeholder="搜索功能开发中。。。"
                 class="search-bar"
                 v-model="searchQuery"
               ></el-input>
@@ -75,17 +81,38 @@
 
           <!-- 顶部导航栏-右侧区域 -->
           <div class="header-nav-right">
-            <el-menu-item index="1">会员中心</el-menu-item>
-            <el-menu-item index="2">消息中心</el-menu-item>
-            <span class="username">欢迎您，灰忆</span>
-            <el-button  type="danger" size="mini" class="logout-button" @click="logout">注销</el-button>
+            <el-menu-item class="small-screen-hide" index="1" @click="developing">会员中心</el-menu-item>
+            <el-menu-item class="small-screen-hide" index="2" @click="developing">消息中心</el-menu-item>
+            <span v-if="isLogined" class="username">欢迎您，尊敬的 {{ this.$store.state.nickname }}</span>
+            <span v-else class="username">欢迎您，尊敬的 游客</span>
+            <!-- 未登录显示登录 -->
+            <el-button v-if="!isLogined"  type="primary" size="mini" class="logout-button" @click="login">登录</el-button>
+            <!-- 已登录显示注销 -->
+            <el-button v-else  type="danger" size="mini" class="logout-button" @click="logout">注销</el-button>
+
           </div>
         </el-menu>
 
         <!-- 右侧内容区域 -->
         <div class="content-box">
+          <div class="headArea">
+              <!-- <p style="color: red;">网站仍在完善中，如有问题请见谅</p> -->
+              <p class="headAttention">
+                  注意，响应式样式尚未完成，
+                  完整内容请在宽度大于1300px的窗口下查看！</p>
+          </div>
           <router-view></router-view>
         </div>
+
+        <!-- 底部ICP备案 -->
+        <footer class="footArea">
+          <p>
+            © 2024 版权所有 | 
+            <a href="https://beian.miit.gov.cn/" target="_blank" class="beian-link">
+              湘ICP备2024096825号
+            </a>
+          </p>
+        </footer>
         
       </div>
     </el-main>
@@ -95,13 +122,29 @@
 
 <script>
 
+import * as menuApi from '@/api/menu'
+
 export default {
   name: "MainPage",
   data() {
       return {
         isCollapse: true,
         //当前激活的菜单项（默认为首页）
-        activeIndex:''
+        activeIndex:'',
+        searchQuery:'',
+        //左侧菜单树
+        menuTree:[]
+
+        //jwt倒计时
+        //剩余时间（秒）
+        ,remainingTime: 0
+        // 格式化后的倒计时
+        ,countdown: ""
+        // 定时器引用
+        ,timer: null
+
+        //是否已登录（true登录 false未登录）
+        ,isLogined:false
       };
   },
   methods: {
@@ -124,17 +167,146 @@ export default {
         this.$router.push(path); 
       }
       
+    },
+
+    //搜索
+    onSearch(){
+      console.log('搜索---',this.searchQuery);
+      this.$message('开发中...敬请期待');
+    },
+    //开发中...
+    developing(){
+      this.$message('开发中...敬请期待');
+    },
+    //登录
+    login(){
+      console.log('登录---'),
+      //触发vuex中的注销方法
+      this.$store.dispatch('logout');
+      this.$router.push('/Login');
+    },
+
+    //注销
+    logout(){
+      console.log('注销---')
+      //触发vuex中的注销方法
+      this.$store.dispatch('logout');
+      this.$router.push('/Login');
+
     }
+
+    //解析jwt
+    ,parseJwt(token) {
+        const base64Url = token.split('.')[1]; // 提取 payload 部分
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(
+            atob(base64)
+            .split('')
+            .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+            .join('')
+        );
+        let parseJWTJson = JSON.parse(jsonPayload)
+        console.log('解析后的jwt---',parseJWTJson)
+        //解析后获取用户的昵称
+        this.$store.state.nickname = parseJWTJson.nickname
+        return parseJWTJson; // 返回解析后的 JSON 对象
+    },
+    //获取jwt时间
+    getTokenRemainingTime(token) {
+        const decoded = this.parseJwt(token);
+        const exp = decoded.exp; // 提取 exp 字段
+        const currentTime = Math.floor(Date.now() / 1000); // 当前时间（秒）
+        return exp - currentTime; // 返回剩余秒数
+    },
+    //时间格式化
+    formatTime(seconds) {
+      const days = Math.floor(seconds / 86400); // 计算天数
+      const hrs = Math.floor((seconds % 86400) / 3600); // 计算剩余小时
+      const mins = Math.floor((seconds % 3600) / 60); // 计算剩余分钟
+      const secs = seconds % 60; // 计算剩余秒数
+
+  return `${days}天 ${hrs}小时 ${mins}分 ${secs}秒`;
+    }
+    //jwt倒计时功能
+    ,startCountdown() {
+      if (!this.$store.state.token) {
+        this.countdown = "无有效 Token";
+        this.isLogined = false;
+        return;
+      }else{
+        this.isLogined = true
+      }
+
+      // 初始化剩余时间
+      this.remainingTime = this.getTokenRemainingTime(this.$store.state.token);
+
+      // 更新倒计时
+      this.updateCountdown();
+
+      // 每秒更新一次
+      this.timer = setInterval(() => {
+        this.remainingTime--;
+        if (this.remainingTime <= 0) {
+          this.stopCountdown();
+          this.countdown = "Token 已过期";
+        } else {
+          this.updateCountdown();
+        }
+      }, 1000);
+    },
+    updateCountdown() {
+      this.countdown = this.formatTime(this.remainingTime);
+    },
+    stopCountdown() {
+      clearInterval(this.timer);
+    }    
+
+    ,
+    // 根据菜单路径递归查找菜单menuIndex
+    findMenuIndexByPath(menuList, currentPath) {
+      for (const menu of menuList) {
+        if (menu.path === currentPath) {
+          return menu.menuIndex;
+        }
+        if (menu.children && menu.children.length > 0) {
+          const result = this.findMenuIndexByPath(menu.children, currentPath);
+          if (result) {
+            return result;
+          }
+        }
+      }
+      return null; // 未找到
+    },
   },
   created() {
     console.log('进入created--')
+    //获取最新的菜单树
+    menuApi.getMenuTree()
+    .then(res=>{
+      console.log('菜单树--res--',res)
+      this.menuTree = res.data
+      console.log('this.menuTree---',this.menuTree)
+
+      //根据当前页面的router找到对应的菜单menuIndex
+      console.log('此时this.$route.path---',this.$route.path)
+      this.activeIndex = this.findMenuIndexByPath(this.menuTree,this.$route.path)
+    })
+    .catch(err=>{
+      console.log('菜单树--err--',err)
+    })
+
+    //获取token
+    console.log('token---',this.$store.state.token)
+    this.token = this.$store.state.token
+    this.startCountdown()
     
   },
   mounted() {
-    this.activeIndex = this.$route.path;
-    console.log('此时this.activeIndex',this.activeIndex)
-  },
-  watch: {
+    
+
+  }
+
+  ,watch: {
   
   }
 };
@@ -145,7 +317,6 @@ export default {
   display: flex;
   width: 100%;
   height: 100%;
-  overflow: hidden;
 }
 
 /* 左侧菜单栏中心区域 */
@@ -166,10 +337,17 @@ export default {
   z-index: 1000; /* 确保在最上层 */
 }
 
+@media (max-width:1300px) {
+  .menu-container {
+    display: none;
+  }
+}
+
 /* 左侧菜单文字图标样式 */
 .left-menu-icon {
   color:#ffffff !important;
   font-size: 20px !important;
+  margin-right: 5px;
 }
 
 /* 左菜单logo图标的外部div */
@@ -209,8 +387,8 @@ export default {
   margin-left: 10px; 
 }
 
- /* 激活菜单项的背景颜色 */
-.el-menu-item.is-active {
+ /* 左侧菜单-激活菜单项的背景颜色 */
+.menu-container .el-menu-item.is-active {
   background-color: #1E7FD0 !important;
 }
 
@@ -224,6 +402,13 @@ export default {
   height: 100%;
   width: 100%;
   top: 44px;
+}
+
+
+@media (max-width:1300px) {
+  .content-container {
+    margin-left: 0%;
+  }
 }
 
 /* 右侧内容区域的容器内部 */
@@ -248,6 +433,12 @@ export default {
   z-index: 1000;
   height: 48px;
 }
+@media (max-width:1300px) {
+  .header-nav {
+    left: 0%;
+    width: 100%;
+  }
+}
 
 /* 顶部导航栏-菜单选项样式 */
 .header-nav .el-menu-item{
@@ -258,22 +449,40 @@ export default {
 
 /* 顶部导航栏的左侧区域 */
 .header-nav-left {
-  display: flex;
-  align-items: center;
-  position: relative;
-  left: 25%;
+  font-size: 14px;
+  padding-left: 10px;
+  width: 25%;
+  color: red;
+}
+@media (max-width:1300px) {
+  .header-nav-left {
+    width: 50%;
+  }
 }
 
 /* 顶部导航栏-左侧区域的搜索栏的容器 */
 .search-wrapper {
-  display: flex;
+  /* display: flex;
+  align-items: center;
+  position: relative; */
+}
+
+/* 顶部导航栏-中间区域 */
+.header-nav-middle{
+   display: flex;
   align-items: center;
   position: relative;
 }
 
+@media (max-width:1300px) {
+  .header-nav-middle {
+    display: none;
+  }
+}
+
 /* 顶部导航栏-搜索栏 */
 .search-bar {
-  width: 450px;
+  width: 360px;
   height: 35px; 
 }
 /* 搜索栏内置样式 */
@@ -306,6 +515,13 @@ export default {
   margin-left: auto;
 }
 
+@media (max-width:1300px) {
+  .header-nav-right {
+    /* display: none; */
+    /* width: 45%; */
+  }
+}
+
 /* 用户名 */
 .username {
   font-size: 13px;
@@ -321,6 +537,40 @@ export default {
   font-size: 14px;
 }
 
+/* 小于1300px隐藏css */
+@media (max-width:1300px) {
+  .small-screen-hide{
+    display: none;
+  }
+}
+
+ /* 头部注意事项栏 */
+.headAttention {
+        display: none;
+        color: #F56C6C;
+        white-space: normal; /* 允许换行 */
+}
+@media (max-width:1300px) {
+    .headAttention {
+        display: block;
+    }
+}
+
+/* 备案区域 */
+.footArea {
+  text-align: center;
+  font-size: 12px;
+  color: #666;
+  padding: 10px 0;
+  background-color: #f9f9f9;
+}
+.beian-link {
+  color: #409EFF;
+  text-decoration: none;
+}
+.beian-link:hover {
+  text-decoration: underline;
+}
 
 
 </style>

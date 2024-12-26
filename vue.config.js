@@ -12,6 +12,9 @@ const myRemoteIp = process.env.MY_REMOTE_IP;
   production：表示生产环境
   test：表示测试环境
 
+  当运行npm run serve时为development
+  当运行npm run build时为production
+
 */
 
 const useRemote = process.env.NODE_ENV === 'production' //在生产环境下使用远程地址
@@ -23,12 +26,23 @@ console.log(`实际使用的ip为---API: ${actualUseIp}`);
 module.exports = defineConfig({
   transpileDependencies: true
   ,  
+  chainWebpack: (config) => {
+    config.plugin('html').tap((args) => {
+      args[0].title = 'tzn'; // 修改标题c
+      return args;
+    });
+  },
   devServer: {
     proxy: {
       '/api': {
         target: `http://${actualUseIp}:8180`, // 后端服务器地址
         changeOrigin: true,
         pathRewrite: { '^/api': '' } 
+      },
+      '/system': {
+        target: `http://${actualUseIp}:8180`, // 后端服务器地址
+        changeOrigin: true,
+        pathRewrite: { '^/system': '' } 
       },
       '/auth': {
         target: `http://${actualUseIp}:8180`, // 后端服务器地址

@@ -1,5 +1,3 @@
-// src/api/auth.js
-
 import request from '@/router/request';
 
 export const login = (username, password) => {
